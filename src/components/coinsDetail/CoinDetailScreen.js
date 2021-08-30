@@ -4,19 +4,75 @@ import React, { Component } from 'react';
 import {
   FlatList,
   Image,
+  Pressable,
   SectionList,
   StyleSheet,
   Text,
+  Alert,
   View,
 } from 'react-native';
 import Http from '../../libs/http';
-import Colors from '../../res/colors';
+import Storage from '../../libs/storage';
+import colors from '../../res/colors';
 import CoinMarketItem from './CoinMarketItem';
 
 class CoinDetailScreen extends Component {
   state = {
     coin: {},
     markets: {},
+    isFavorite: false,
+  };
+
+  toggleFavorite = () => {
+    if (this.state.isFavorite) {
+      this.removeFavorite();
+    } else {
+      this.addFavorite();
+    }
+  };
+
+  removeFavorite = async () => {
+    Alert.alert('Remove Favorite', 'Are you sure?', [
+      {
+        text: 'Cancel',
+        onPress: () => {},
+        style: 'cancel',
+      },
+      {
+        text: 'Remove',
+        onPress: async () => {
+          const key = `favorite-${this.state.coin.id}`;
+
+          const removed = await Storage.instance.remove(key);
+          if (removed) {
+            this.setState({ isFavorite: false });
+          }
+        },
+        style: 'destructive',
+      },
+    ]);
+  };
+
+  addFavorite = async () => {
+    const coin = JSON.stringify(this.state.coin);
+    const key = `favorite-${this.state.coin.id}`;
+
+    const stored = await Storage.instance.store(key, coin);
+    if (stored) {
+      this.setState({ isFavorite: true });
+    }
+  };
+
+  getFavorite = async () => {
+    try {
+      const key = `favorite-${this.state.coin.id}`;
+      const favorite = await Storage.instance.get(key);
+      if (favorite) {
+        this.setState({ isFavorite: true });
+      }
+    } catch (err) {
+      console.log('error to load favorite', err);
+    }
   };
 
   getSymbolIcon = (coinNameId) => {
@@ -26,7 +82,9 @@ class CoinDetailScreen extends Component {
   };
 
   setCoinValues = (coin) => {
-    this.setState({ coin: coin });
+    this.setState({ coin: coin }, () => {
+      this.getFavorite();
+    });
   };
 
   getMarkets = async (coinId) => {
@@ -41,8 +99,6 @@ class CoinDetailScreen extends Component {
     this.props.navigation.setOptions({ title: coin.symbol });
     this.setCoinValues(coin);
     this.getMarkets(coin.id);
-    console.log('id' + coin.id);
-    console.log(this.state.markets);
   };
 
   getSections = (coin) => {
@@ -64,21 +120,34 @@ class CoinDetailScreen extends Component {
   };
 
   render() {
-    const { coin, markets } = this.state;
+    const { coin, markets, isFavorite } = this.state;
 
     return (
       <View style={styles.container}>
         <View style={styles.subHeader}>
-          <Image
-            style={styles.iconImg}
-            source={{ uri: this.getSymbolIcon(coin.nameid) }}
-          />
-          <Text style={styles.titleText}>{coin.name}</Text>
+          <View style={styles.row}>
+            <Image
+              style={styles.iconImg}
+              source={{ uri: this.getSymbolIcon(coin.nameid) }}
+            />
+            <Text style={styles.titleText}>{coin.name}</Text>
+          </View>
+
+          <Pressable
+            onPress={this.toggleFavorite}
+            style={[
+              styles.btnFavorite,
+              isFavorite ? styles.btnFavoriteRemove : styles.btnFavoriteAdd,
+            ]}>
+            <Text style={styles.btnFavoriteText}>
+              {isFavorite ? 'Remove Favorite' : 'Add Favorites'}
+            </Text>
+          </Pressable>
         </View>
         <SectionList
           style={styles.section}
           sections={this.getSections(coin)}
-          keyExtractor={(item) => item}
+          keyExtractor={(item, index) => index}
           renderItem={({ item }) => (
             <View style={styles.sectionItem}>
               <Text style={styles.itemText}>{item}</Text>
@@ -95,9 +164,8 @@ class CoinDetailScreen extends Component {
           style={styles.list}
           data={markets}
           horizontal={true}
-          renderItem={({ item }) => (
-            <CoinMarketItem key={item.name} item={item} />
-          )}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <CoinMarketItem item={item} />}
         />
       </View>
     );
@@ -107,7 +175,7 @@ class CoinDetailScreen extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.charade,
+    backgroundColor: colors.charade,
   },
   section: {
     maxHeight: 220,
@@ -119,10 +187,15 @@ const styles = StyleSheet.create({
   sectionItem: {
     padding: 8,
   },
+  row: {
+    flexDirection: 'row',
+  },
   subHeader: {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
     padding: 12,
     flexDirection: 'row',
+    alignContent: 'center',
+    justifyContent: 'space-between',
   },
   list: {
     maxHeight: 150,
@@ -131,28 +204,44 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.white,
+    color: colors.white,
     marginLeft: 10,
+    textAlignVertical: 'center',
   },
   iconImg: {
     width: 25,
     height: 25,
+    alignSelf: 'center',
   },
   itemText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 14,
   },
   sectionText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 14,
     fontWeight: 'bold',
   },
   marketTitle: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 16,
     marginLeft: 16,
+  },
+  btnFavorite: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  btnFavoriteText: {
+    color: colors.white,
+    fontSize: 14,
+  },
+  btnFavoriteAdd: {
+    backgroundColor: colors.picton,
+  },
+  btnFavoriteRemove: {
+    backgroundColor: colors.carmine,
   },
 });
 
